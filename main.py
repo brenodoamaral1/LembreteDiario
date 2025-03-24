@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import asyncio
 import os
 import json
+from dateutil import parser
 
 TOKEN = os.environ.get("BOT_TOKEN")
 CANAL_ID = 717521046642622508
@@ -60,7 +61,12 @@ async def on_ready():
 )
 async def lembrete(interaction: discord.Interaction, data: str, titulo: str, mensagem: str):
     try:
-        data_lembrete = datetime.strptime(data.strip(), '%d/%m/%Y')
+        try:
+            data_lembrete = parser.parse(data.strip(), dayfirst=True)
+        except Exception:
+            await interaction.response.send_message("❌ Data inválida. Use o formato DD/MM/AAAA (ex: 25/03/2025)", ephemeral=True)
+            return
+
         hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
         if data_lembrete < hoje:
@@ -69,7 +75,7 @@ async def lembrete(interaction: discord.Interaction, data: str, titulo: str, men
 
         canal = bot.get_channel(CANAL_ID)
         if not canal:
-            await interaction.response.send_message("❌ Canal não encontrado.", ephemeral=True)
+            await interaction.response.send_message("❌ Canal não encontrado. Verifique as permissões do bot.", ephemeral=True)
             return
 
         lembretes_salvos = carregar_lembretes()
@@ -100,8 +106,8 @@ async def lembrete(interaction: discord.Interaction, data: str, titulo: str, men
             ephemeral=False
         )
 
-    except ValueError:
-        await interaction.response.send_message("❌ Data inválida. Use o formato DD/MM/AAAA", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erro inesperado: {e}", ephemeral=True)
 
 @tree.command(name="testar_mensagem", description="Envia uma mensagem de teste agora")
 @app_commands.describe(
