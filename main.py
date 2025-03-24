@@ -37,7 +37,6 @@ def agendar_mensagem(data_envio: datetime, canal, conteudo: str):
         run_date=data_envio
     )
 
-
 @bot.event
 async def on_ready():
     if not scheduler.running:
@@ -61,7 +60,7 @@ async def on_ready():
 )
 async def lembrete(interaction: discord.Interaction, data: str, titulo: str, mensagem: str):
     try:
-        data_lembrete = datetime.strptime(data, '%d/%m/%Y')
+        data_lembrete = datetime.strptime(data.strip(), '%d/%m/%Y')
         hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
         if data_lembrete < hoje:
