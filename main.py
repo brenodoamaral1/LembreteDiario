@@ -46,7 +46,7 @@ async def on_ready():
     lembretes = carregar_lembretes()
     canal = bot.get_channel(CANAL_ID)
     for lembrete in lembretes:
-        data_envio = datetime.strptime(lembrete["data_envio"], "%Y-%m-%d %H:%M:%S")
+        data_envio = datetime.strptime(lembrete["data_envio"], "%d/%m/%Y %H:%M:%S")
         conteudo = lembrete["mensagem"]
         agendar_mensagem(data_envio, canal, conteudo)
 
@@ -90,7 +90,7 @@ async def lembrete(interaction: discord.Interaction, data: str, titulo: str, men
 
             agendar_mensagem(hora_envio, canal, conteudo)
             lembretes_salvos.append({
-                "data_envio": hora_envio.strftime("%Y-%m-%d %H:%M:%S"),
+                "data_envio": hora_envio.strftime("%d/%m/%Y %H:%M:%S"),
                 "mensagem": conteudo
             })
 
