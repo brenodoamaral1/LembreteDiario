@@ -6,11 +6,8 @@ from datetime import datetime, timedelta
 import asyncio
 import os
 import json
-from dotenv import load_dotenv
 
-load_dotenv()
-
-TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = os.environ.get("BOT_TOKEN")
 CANAL_ID = 717521046642622508
 LEMBRETES_FILE = "lembretes.json"
 
