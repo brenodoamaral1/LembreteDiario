@@ -52,69 +52,80 @@ async def on_ready():
     await tree.sync()
     print(f"✅ Bot conectado como {bot.user}")
 
-@tree.command(name="lembrete", description="Agende lembretes diários até uma data e com notificações no horário")
+@tree.command(name="lembrete", description="Agende lembretes diários até a data escolhida")
 @app_commands.describe(
     data="Data final do lembrete no formato DD/MM/AAAA",
-    hora="Horário do lembrete no formato HH:MM (24h)",
+    hora="Horário do evento no formato HH:MM (24h)",
     titulo="Título do lembrete",
     mensagem="Mensagem complementar"
 )
 async def lembrete(interaction: discord.Interaction, data: str, hora: str, titulo: str, mensagem: str):
     try:
-        try:
-            data_base = parser.parse(f"{data.strip()} {hora.strip()}", dayfirst=True)
-        except Exception:
-            await interaction.response.send_message("❌ Data ou hora inválida. Use os formatos DD/MM/AAAA e HH:MM (ex: 25/03/2025 20:00)", ephemeral=True)
-            return
-
+        data_lembrete = datetime.strptime(f"{data.strip()} {hora.strip()}", "%d/%m/%Y %H:%M")
         agora = datetime.now()
-        if data_base <= agora:
+        hoje = agora.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        if data_lembrete <= agora:
             await interaction.response.send_message("❌ A data e hora precisam ser no futuro.", ephemeral=True)
             return
 
         canal = interaction.channel
         lembretes_salvos = carregar_lembretes()
-        hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        dias = (data_base.replace(hour=0, minute=0, second=0, microsecond=0) - hoje).days
+        dias = (data_lembrete.date() - hoje.date()).days
 
         for i in range(dias + 1):
-            data_atual = hoje + timedelta(days=i)
-            hora_base = data_atual.replace(hour=data_base.hour, minute=data_base.minute, second=0)
-
-            if hora_base <= agora:
-                continue
+            data_envio = hoje + timedelta(days=i)
+            hora_envio = data_envio.replace(hour=12, minute=30, second=0)
 
             if i == dias:
-                # Somente no último dia: 1h antes, 30min antes, e na hora
-                horarios = [
-                    (hora_base - timedelta(hours=1), f"⏰ **{titulo}** começa em 1 hora!🎲 {mensagem}"),
-                    (hora_base - timedelta(minutes=30), f"⏰ **{titulo}** começa em 30 minutos!🎲 {mensagem}"),
-                    (hora_base, f"🚨 **{titulo}** está começando agora!🎲 {mensagem}")
+                hora_evento = data_lembrete.replace(second=0)
+                conteudos_especiais = [
+                    (hora_evento - timedelta(hours=1), f"⏰ **{titulo}** começa em 1 hora!\n🎲 {mensagem}"),
+                    (hora_evento - timedelta(minutes=30), f"⏰ **{titulo}** começa em 30 minutos!\n🎲 {mensagem}"),
+                    (hora_evento, f"📢 Lembrete Diário! **{titulo}**\n🎲 {mensagem}\nHOJE!!")
                 ]
+                for envio, conteudo in conteudos_especiais:
+                    if envio > agora:
+                        agendar_mensagem(envio, canal, conteudo)
+                        lembretes_salvos.append({
+                            "data_envio": envio.strftime("%d/%m/%Y %H:%M:%S"),
+                            "mensagem": conteudo,
+                            "canal_id": canal.id
+                        })
+                continue
+            elif i == dias - 1:
+                conteudo = f"📢 Lembrete Diário! **{titulo}**\n🎲 {mensagem}\nAMANHÃ!"
             else:
-                # Dias anteriores: lembrete simples de contagem regressiva
                 faltam = dias - i
-                conteudo = f"📅 Contagem regressiva para **{titulo}**🎲 {mensagem} Faltam **{faltam}** dia{'s' if faltam > 1 else ''}!"
-                horarios = [(hora_base, conteudo)]
+                conteudo = f"📢 Lembrete Diário! **{titulo}**\n🎲 {mensagem}\nFaltam **{faltam}** dia{'s' if faltam > 1 else ''}!"
 
-
-                if horarios > agora:
-                    agendar_mensagem(horarios, canal, conteudo)
-                    lembretes_salvos.append({
-                        "data_envio": horarios.strftime("%d/%m/%Y %H:%M:%S"),
-                        "mensagem": conteudo,
-                        "canal_id": canal.id
-                    })
+            agendar_mensagem(hora_envio, canal, conteudo)
+            lembretes_salvos.append({
+                "data_envio": hora_envio.strftime("%d/%m/%Y %H:%M:%S"),
+                "mensagem": conteudo,
+                "canal_id": canal.id
+            })
 
         salvar_lembretes(lembretes_salvos)
 
         await interaction.response.send_message(
-            f"✅ Lembretes diários com notificações agendados até {data_base.strftime('%d/%m/%Y às %H:%M')} com o título: '{titulo}'",
+            f"✅ Lembretes diários agendados até {data_lembrete.strftime('%d/%m/%Y %H:%M')} com o título: '{titulo}'",
             ephemeral=False
         )
 
-    except Exception as e:
-        await interaction.response.send_message(f"❌ Erro inesperado: {e}", ephemeral=True)
+    except ValueError:
+        await interaction.response.send_message("❌ Data inválida. Use o formato DD/MM/AAAA e HH:MM", ephemeral=True)
+
+@tree.command(name="testar_mensagem", description="Envia uma mensagem de teste agora")
+@app_commands.describe(
+    titulo="Título da mensagem de teste",
+    mensagem="Mensagem complementar"
+)
+async def testar_mensagem(interaction: discord.Interaction, titulo: str, mensagem: str):
+    canal = interaction.channel
+    conteudo = f"📢 **{titulo}**\n🎲 {mensagem}\n(mensagem de teste)"
+    await canal.send(conteudo)
+    await interaction.response.send_message("✅ Mensagem enviada!", ephemeral=True)
 
 @tree.command(name="editar_lembrete", description="Edita um lembrete existente pela data e nova mensagem")
 @app_commands.describe(
@@ -160,16 +171,5 @@ async def apagar_lembrete(interaction: discord.Interaction, data: str):
 
     except Exception as e:
         await interaction.response.send_message(f"❌ Erro ao apagar: {e}", ephemeral=True)
-
-@tree.command(name="testar_mensagem", description="Envia uma mensagem de teste agora")
-@app_commands.describe(
-    titulo="Título da mensagem de teste",
-    mensagem="Mensagem complementar"
-)
-async def testar_mensagem(interaction: discord.Interaction, titulo: str, mensagem: str):
-    canal = interaction.channel
-    conteudo = f"📢 **{titulo}**\n🎲 {mensagem}\n(mensagem de teste)"
-    await canal.send(conteudo)
-    await interaction.response.send_message("✅ Mensagem enviada!", ephemeral=True)
 
 bot.run(TOKEN)
