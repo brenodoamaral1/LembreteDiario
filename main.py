@@ -29,10 +29,16 @@ def salvar_lembretes(lembretes):
         json.dump(lembretes, f, ensure_ascii=False, indent=2)
 
 # Função para agendar mensagem
-def agendar_mensagem(data_envio: datetime, canal, conteudo: str):
+def agendar_mensagem(data_envio: datetime, canal, conteudo: str, lembretes_salvos=None):
     loop = asyncio.get_event_loop()
+    def enviar_e_limpar():
+        asyncio.run_coroutine_threadsafe(canal.send(conteudo), loop)
+        if lembretes_salvos is not None:
+            atualizados = [l for l in lembretes_salvos if l["data_envio"] != data_envio.strftime("%d/%m/%Y %H:%M:%S") or l["mensagem"] != conteudo]
+            salvar_lembretes(atualizados)
+
     scheduler.add_job(
-        lambda: asyncio.run_coroutine_threadsafe(canal.send(conteudo), loop),
+        enviar_e_limpar,
         trigger='date',
         run_date=data_envio
     )
@@ -80,13 +86,13 @@ async def lembrete(interaction: discord.Interaction, data: str, hora: str, titul
             if i == dias:
                 hora_evento = data_lembrete.replace(second=0)
                 conteudos_especiais = [
-                    (hora_evento - timedelta(hours=1), f"⏰ **{titulo}** começa em 1 hora!\n🎲 {mensagem}"),
-                    (hora_evento - timedelta(minutes=30), f"⏰ **{titulo}** começa em 30 minutos!\n🎲 {mensagem}"),
-                    (hora_evento, f"📢 Lembrete Diário! **{titulo}**\n🎲 {mensagem}\nHOJE!!")
+                    (hora_evento - timedelta(hours=1), f"📢 **Lembrete Diário!{titulo}** \n🎲 {mensagem}\ncomeça em 1 hora!"),
+                    (hora_evento - timedelta(minutes=30), f"📢 **Lembrete Diário!{titulo}** \n🎲 {mensagem}\ncomeça em 30 minutos!"),
+                    (hora_evento, f"📢 **Lembrete Diário! {titulo}**\n🎲 {mensagem}\nHOJE!!")
                 ]
                 for envio, conteudo in conteudos_especiais:
                     if envio > agora:
-                        agendar_mensagem(envio, canal, conteudo)
+                        agendar_mensagem(envio, canal, conteudo, lembretes_salvos)
                         lembretes_salvos.append({
                             "data_envio": envio.strftime("%d/%m/%Y %H:%M:%S"),
                             "mensagem": conteudo,
@@ -94,12 +100,12 @@ async def lembrete(interaction: discord.Interaction, data: str, hora: str, titul
                         })
                 continue
             elif i == dias - 1:
-                conteudo = f"📢 Lembrete Diário! **{titulo}**\n🎲 {mensagem}\nAMANHÃ!"
+                conteudo = f"📢 **Lembrete Diário! {titulo}**\n🎲 {mensagem}\nAMANHÃ!"
             else:
                 faltam = dias - i
-                conteudo = f"📢 Lembrete Diário! **{titulo}**\n🎲 {mensagem}\nFaltam **{faltam}** dia{'s' if faltam > 1 else ''}!"
+                conteudo = f"📢 **Lembrete Diário! {titulo}**\n🎲 {mensagem}\nFaltam **{faltam}** dia{'s' if faltam > 1 else ''}!"
 
-            agendar_mensagem(hora_envio, canal, conteudo)
+            agendar_mensagem(hora_envio, canal, conteudo, lembretes_salvos)
             lembretes_salvos.append({
                 "data_envio": hora_envio.strftime("%d/%m/%Y %H:%M:%S"),
                 "mensagem": conteudo,
