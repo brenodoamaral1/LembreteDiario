@@ -52,9 +52,9 @@ async def on_ready():
     await tree.sync()
     print(f"✅ Bot conectado como {bot.user}")
 
-@tree.command(name="lembrete", description="Agende um lembrete para uma data e horário específico")
+@tree.command(name="lembrete", description="Agende lembretes diários até uma data e com notificações no horário")
 @app_commands.describe(
-    data="Data do lembrete no formato DD/MM/AAAA",
+    data="Data final do lembrete no formato DD/MM/AAAA",
     hora="Horário do lembrete no formato HH:MM (24h)",
     titulo="Título do lembrete",
     mensagem="Mensagem complementar"
@@ -62,39 +62,54 @@ async def on_ready():
 async def lembrete(interaction: discord.Interaction, data: str, hora: str, titulo: str, mensagem: str):
     try:
         try:
-            data_hora = parser.parse(f"{data.strip()} {hora.strip()}", dayfirst=True)
+            data_base = parser.parse(f"{data.strip()} {hora.strip()}", dayfirst=True)
         except Exception:
             await interaction.response.send_message("❌ Data ou hora inválida. Use os formatos DD/MM/AAAA e HH:MM (ex: 25/03/2025 20:00)", ephemeral=True)
             return
 
         agora = datetime.now()
-        if data_hora < agora:
+        if data_base <= agora:
             await interaction.response.send_message("❌ A data e hora precisam ser no futuro.", ephemeral=True)
             return
 
         canal = interaction.channel
         lembretes_salvos = carregar_lembretes()
+        hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        dias = (data_base.replace(hour=0, minute=0, second=0, microsecond=0) - hoje).days
 
-        # Agendar mensagens
-        horarios = [
-            (data_hora - timedelta(hours=1), f"⏰ **{titulo}** começa em 1 hora!\n🎲 {mensagem}"),
-            (data_hora - timedelta(minutes=30), f"⏰ **{titulo}** começa em 30 minutos!\n🎲 {mensagem}"),
-            (data_hora, f"🚨 **{titulo}** está começando agora!\n🎲 {mensagem}")
-        ]
+        for i in range(dias + 1):
+            data_atual = hoje + timedelta(days=i)
+            hora_base = data_atual.replace(hour=data_base.hour, minute=data_base.minute, second=0)
 
-        for horario, conteudo in horarios:
-            if horario > agora:
-                agendar_mensagem(horario, canal, conteudo)
-                lembretes_salvos.append({
-                    "data_envio": horario.strftime("%d/%m/%Y %H:%M:%S"),
-                    "mensagem": conteudo,
-                    "canal_id": canal.id
-                })
+            if hora_base <= agora:
+                continue
+
+            if i == dias:
+                # Somente no último dia: 1h antes, 30min antes, e na hora
+                horarios = [
+                    (hora_base - timedelta(hours=1), f"⏰ **{titulo}** começa em 1 hora!🎲 {mensagem}"),
+                    (hora_base - timedelta(minutes=30), f"⏰ **{titulo}** começa em 30 minutos!🎲 {mensagem}"),
+                    (hora_base, f"🚨 **{titulo}** está começando agora!🎲 {mensagem}")
+                ]
+            else:
+                # Dias anteriores: lembrete simples de contagem regressiva
+                faltam = dias - i
+                conteudo = f"📅 Contagem regressiva para **{titulo}**🎲 {mensagem} Faltam **{faltam}** dia{'s' if faltam > 1 else ''}!"
+                horarios = [(hora_base, conteudo)]
+
+
+                if horarios > agora:
+                    agendar_mensagem(horarios, canal, conteudo)
+                    lembretes_salvos.append({
+                        "data_envio": horarios.strftime("%d/%m/%Y %H:%M:%S"),
+                        "mensagem": conteudo,
+                        "canal_id": canal.id
+                    })
 
         salvar_lembretes(lembretes_salvos)
 
         await interaction.response.send_message(
-            f"✅ Lembrete agendado para {data_hora.strftime('%d/%m/%Y às %H:%M')} com o título: '{titulo}'",
+            f"✅ Lembretes diários com notificações agendados até {data_base.strftime('%d/%m/%Y às %H:%M')} com o título: '{titulo}'",
             ephemeral=False
         )
 
