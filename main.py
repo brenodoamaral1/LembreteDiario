@@ -88,7 +88,7 @@ async def lembrete(interaction: discord.Interaction, data: str, hora: str, titul
                 conteudos_especiais = [
                     (hora_evento - timedelta(hours=1), f"📢 **Lembrete Diário!{titulo}** \n🎲 {mensagem}\n📅**começa em 1 hora!**"),
                     (hora_evento - timedelta(minutes=30), f"📢 **Lembrete Diário!{titulo}** \n🎲 {mensagem}\n📅**começa em 30 minutos!**"),
-                    (hora_evento, f"📢 **Lembrete Diário! {titulo}**\n🎲 {mensagem}\nHOJE!!")
+                    (hora_evento, f"📢 **Lembrete Diário! {titulo}**\n🎲 {mensagem}\nAGORA!!")
                 ]
                 for envio, conteudo in conteudos_especiais:
                     if envio > agora:
@@ -101,6 +101,8 @@ async def lembrete(interaction: discord.Interaction, data: str, hora: str, titul
                 continue
             elif i == dias - 1:
                 conteudo = f"📢 **Lembrete Diário! {titulo}**\n🎲 {mensagem}\n📅**AMANHÃ!**"
+            elif i == dias == 1:
+                conteudo = f"📢 **Lembrete Diário! {titulo}**\n🎲 {mensagem}\n📅**HOJE!**"
             else:
                 faltam = dias - i
                 conteudo = f"📢 **Lembrete Diário! {titulo}**\n🎲 {mensagem}\n📅Faltam **{faltam}** dia{'s' if faltam > 1 else ''}!"
